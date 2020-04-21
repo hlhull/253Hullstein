@@ -9,9 +9,27 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
-diabetes = read.csv("diabetic_data.csv")  # read csv file 
-diabetes 
+```{r, echo=FALSE}
+library(tidyverse)
+library(broom)
+theme_set(theme_minimal())
 ```
 
+
+```{r}
+diabetes = read.csv("diabetic_data.csv")  # read csv file 
+head(diabetes)
+```
+
+```{r}
+summary(diabetes)
+glimpse(diabetes)
+```
+
+
+```{r}
+diabetes %>% 
+  select(readmitted) %>% 
+  summary()
+```
 
