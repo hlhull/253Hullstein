@@ -11,13 +11,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r, echo=FALSE}
 library(tidyverse)
-library(broom)
+library(janitor)
 theme_set(theme_minimal())
 ```
 
 
 ```{r}
-diabetes = read.csv("diabetic_data.csv")  # read csv file 
+diabetes <- read_csv("diabetic_data.csv", na = "?")
 head(diabetes)
 ```
 
