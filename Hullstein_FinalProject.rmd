@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r, echo=FALSE}
 library(tidyverse)
 library(janitor)
+library(broom)
+
 theme_set(theme_minimal())
 ```
 
@@ -27,9 +29,36 @@ glimpse(diabetes)
 ```
 
 
+
+```{r}
+diabetes <- diabetes %>% 
+  mutate(readmitted30 = ifelse(readmitted == "<30", 'true', 'false'))
+```
+
+```{r}
+ggplot(diabetes, aes(x=readmitted)) +
+  geom_bar()
+
+ggplot(diabetes, aes(x=age, fill=readmitted30)) +
+  geom_bar()
+
+ggplot(diabetes, aes(x=num_lab_procedures)) +
+  geom_histogram()
+```
 ```{r}
 diabetes %>% 
-  select(readmitted) %>% 
-  summary()
+  ggplot(aes(x = age, fill = readmitted30)) +
+  geom_bar(position = "fill")
 ```
+
+```{r}
+ggplot(diabetes, aes(x=num_lab_procedures, fill=readmitted)) +
+  geom_density(alpha=.5)
+```
+
+
+
+
+
+
 
