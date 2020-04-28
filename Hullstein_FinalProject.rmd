@@ -14,33 +14,70 @@ library(tidyverse)
 library(janitor)
 library(broom)
 
+library(ISLR) #for data
+library(moderndive) #for data
+library(rattle) #weather data
+
 theme_set(theme_minimal())
 ```
 
+## READ IN DATA / CLEAN
 
 ```{r}
+# read in data, replace ? with NA
 diabetes <- read_csv("diabetic_data.csv", na = "?")
-head(diabetes)
-```
 
-```{r}
-summary(diabetes)
-glimpse(diabetes)
-```
+# remove people who died who were discharged to hospice
+diabetes <- diabetes[!(diabetes$discharge_disposition_id==19 |
+                         diabetes$discharge_disposition_id==21 |
+                         diabetes$discharge_disposition_id==13 |
+                         diabetes$discharge_disposition_id==14 |
+                         diabetes$discharge_disposition_id==11 |
+                         diabetes$discharge_disposition_id==20),]
 
+# make classifications categories
+diabetes$discharge_disposition_id <- as.factor(diabetes$discharge_disposition_id)
+diabetes$admission_type_id <- as.factor(diabetes$admission_type_id)
+diabetes$admission_source_id <- as.factor(diabetes$admission_source_id)
 
+# lump discharge into 4 categories
+diabetes <- diabetes %>%
+  mutate(discharge_disposition_id = fct_lump(discharge_disposition_id,n=3))
 
-```{r}
+# remove medicines without 2+ categories, categories with lots missing, and other variables
+drop <- c("acetohexamide", "tolbutamide", "troglitazone", "examide", "citoglipton", "glyburide-metformin", "glipizide-metformin", "glimepiride-pioglitazone", "metformin-rosiglitazone", "metformin-pioglitazone", "weight", "medical_specialty", "payer_code", "encounter_id", "patient_nbr", "diag_1", "diag_2", "diag_3")
+diabetes <- diabetes[, !(names(diabetes) %in% drop)]
+
+# make binomial readmitted variable
 diabetes <- diabetes %>% 
   mutate(readmitted30 = ifelse(readmitted == "<30", 'true', 'false'))
+
+# split into test and train
+set.seed(253) 
+diab_split <- initial_split(diabetes, prop = .7, 
+                             strata = readmitted30)
+diab_train <- training(diab_split)
+diab_test <- testing(diab_split)
+
+head(diab_train)
 ```
+
+
+```{r}
+dim(diab_train)
+glimpse(diab_train)
+```
+
+
+
+## GRAPHS
 
 ```{r}
 ggplot(diabetes, aes(x=readmitted)) +
   geom_bar()
 
 ggplot(diabetes, aes(x=age, fill=readmitted30)) +
-  geom_bar()
+  geom_bar(position="fill")
 
 ggplot(diabetes, aes(x=num_lab_procedures)) +
   geom_histogram()
@@ -49,13 +86,76 @@ ggplot(diabetes, aes(x=num_lab_procedures)) +
 diabetes %>% 
   ggplot(aes(x = age, fill = readmitted30)) +
   geom_bar(position = "fill")
-```
 
-```{r}
-ggplot(diabetes, aes(x=num_lab_procedures, fill=readmitted)) +
+diabetes %>% 
+  ggplot(aes(x = readmitted30, fill = age)) +
+  geom_bar(position = "fill")
+
+diabetes %>% 
+  ggplot(aes(x = readmitted30, fill = A1Cresult)) +
+  geom_bar(position = "fill")
+
+diabetes %>% 
+  ggplot(aes(x = readmitted30, fill = factor(time_in_hospital))) +
+  geom_bar(position = "fill")
+diabetes %>% 
+  ggplot(aes(x = factor(time_in_hospital), fill = readmitted30)) +
+  geom_bar(position = "fill")
+
+ggplot(diabetes, aes(x=time_in_hospital, fill=readmitted30)) +
   geom_density(alpha=.5)
 ```
 
+```{r}
+ggplot(diabetes, aes(x=num_lab_procedures, fill=readmitted30)) +
+  geom_density(alpha=.5)
+
+
+```
+
+
+## MODELS
+
+```{r}
+# Set the seed
+set.seed(253)
+
+# Run the model
+diab_logAll <- train(
+    readmitted30 ~ race + gender + age + admission_type_id + discharge_disposition_id + admission_source_id + time_in_hospital + num_lab_procedures + num_procedures + num_medications,
+    data = diab_train, 
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 5),
+    metric = "Accuracy",
+    na.action = na.omit
+)
+```
+
+```{r}
+summary(diab_logAll)
+diab_logAll$results$Accuracy
+
+```
+readmitted30 ~ race + gender + age + admission_type_id + discharge_disposition_id + admission_source_id + time_in_hospital,
+.8855722
+
+
+set.seed(327)
+
+# random forest
+diab_randf <- train(
+  readmitted30 ~ .,
+  data = diab_train %>% select(-weight, -encounter_id, -patient_nbr, -payer_code, -medical_specialty), 
+  method = "rf",
+  metric = "Accuracy",
+  trControl = trainControl(method = "oob"),
+  tuneGrid = data.frame(mtry = c(2,4,6)),
+  ntree = 50, #number of trees used, default is 500
+  importance = TRUE, #for importance plots later
+  nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
+  na.action = na.omit
+)
 
 
 
