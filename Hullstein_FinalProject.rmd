@@ -10,13 +10,41 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo=FALSE}
-library(tidyverse)
-library(janitor)
-library(broom)
+#plotting and exploring
+library(tidyverse) #for plotting and summarizing
+library(GGally) #for nice scatterplot matrix 
+library(ggridges) #for joy/ridge plots
+library(corrplot) #for basic correlation matrix plot
+library(naniar) #for exploring missing values
+library(pdp) #for partial dependence plots, MARS models
+library(rpart.plot) #for plotting decision trees
+library(vip) #for importance plots
+library(pROC) #for ROC curves
+library(plotROC) #for plotting ROC curves
 
+#making things look nice
+library(lubridate) #for nice dates
+library(knitr) #for nice tables
+library(scales) #for nice labels on graphs
+library(gridExtra) #for arranging plots
+library(broom) #for nice model output
+library(janitor) #for nice names
+
+#data
 library(ISLR) #for data
 library(moderndive) #for data
-library(rattle) #weather data
+
+#modeling
+library(rsample) #for splitting data
+library(recipes) #for keeping track of transformations
+library(caret) #for modeling
+library(leaps) #for variable selection
+library(glmnet) #for LASSO
+library(earth) #for MARS models
+library(rpart) #for decision trees
+library(randomForest) #for bagging and random forests
+
+library(e1071)
 
 theme_set(theme_minimal())
 ```
@@ -51,7 +79,9 @@ diabetes <- diabetes[, !(names(diabetes) %in% drop)]
 # make binomial readmitted variable
 diabetes <- diabetes %>% 
   mutate(readmitted30 = ifelse(readmitted == "<30", 'true', 'false'))
+```
 
+```{r}
 # split into test and train
 set.seed(253) 
 diab_split <- initial_split(diabetes, prop = .7, 
@@ -82,6 +112,7 @@ ggplot(diabetes, aes(x=age, fill=readmitted30)) +
 ggplot(diabetes, aes(x=num_lab_procedures)) +
   geom_histogram()
 ```
+
 ```{r}
 diabetes %>% 
   ggplot(aes(x = age, fill = readmitted30)) +
@@ -109,8 +140,6 @@ ggplot(diabetes, aes(x=time_in_hospital, fill=readmitted30)) +
 ```{r}
 ggplot(diabetes, aes(x=num_lab_procedures, fill=readmitted30)) +
   geom_density(alpha=.5)
-
-
 ```
 
 
