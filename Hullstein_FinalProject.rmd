@@ -91,16 +91,14 @@ diab_test <- testing(diab_split)
 
 head(diab_train)
 ```
-
+## GRAPHS
+TO DO: Introduce your data and research question. It might be helpful to include a graph/table that summarizes the response variable. Lay out the plan you will use to analyze/model so we (the readers!) can more easily follow along and knows what to expect. It can be helpful to elude to some of the results at the beginning so we know what to watch for. Also mention any important data cleaning decisions you made. You don’t need to tell us EVERYTHING you do, though.
 
 ```{r}
 dim(diab_train)
 glimpse(diab_train)
 ```
 
-
-
-## GRAPHS
 
 ```{r}
 ggplot(diabetes, aes(x=readmitted)) +
@@ -145,6 +143,9 @@ ggplot(diabetes, aes(x=num_lab_procedures, fill=readmitted30)) +
 
 ## MODELS
 
+TO DO: Exploratory work and basic models. Use graphs to illustrate interesting relationshipos that play a role in your final model. DO NOT just show a bunch of graphs because you can. You should label and discuss every graph you include. There is no required number to include. The graphs should be helping us to understand something about your final model and should help us engage more with the data.
+
+
 ```{r}
 # Set the seed
 set.seed(253)
@@ -186,6 +187,19 @@ diab_randf <- train(
   na.action = na.omit
 )
 
+
+## PROCESS
+
+TO DO: Describe the modeling process. I don’t want to know EVERYTHING you tried. You might have tried 10 different things and in the end chose the 8th one. If you think it is important, you can summarize some other methods you tried. But focus on the analysis you found to be most important. This should include at least one of the techniques you learned in this course. Some essentials you will need in the modeling process:
+
+  Use rsample() to split the data into a training and test set.
+  Tune the model using the training data.
+  Evaluate model using training data (cross-validation or OOB).
+  Pick a few “best” models and apply them to the test data to decide on the final model.
+
+## SUMMARY
+
+Summarize the results succinctly. Reiterate why we should be interested in this analysis. Depending on the project, you might do this in different ways. Maybe there were important relationships you learned about. Or maybe you have a nice way to predict something useful. Let us know what we’ve learned and why it’s important/neat/interesting.
 
 
 
