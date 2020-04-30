@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 ```
 
 ```{r, echo=FALSE}
@@ -146,14 +146,30 @@ ggplot(diabetes, aes(x=num_lab_procedures, fill=readmitted30)) +
 TO DO: Exploratory work and basic models. Use graphs to illustrate interesting relationshipos that play a role in your final model. DO NOT just show a bunch of graphs because you can. You should label and discuss every graph you include. There is no required number to include. The graphs should be helping us to understand something about your final model and should help us engage more with the data.
 
 
+# LOGISTIC REGRESSION 
+
+```{r}
+other_vars <- c('race', 'gender', 'age', 'admission_type_id', 'discharge_disposition_id', 'admission_source_id','time_in_hospital','num_lab_procedures','num_procedures', 'num_medications', 'readmitted30')
+other_subset <- diab_train[other_vars]
+
+
+med_vars <- c('metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride', 'glipizide','glyburide','pioglitazone','rosiglitazone','acarbose','miglitol','tolazamide',
+  'insulin', 'readmitted30')
+med_subset <- diab_train[med_vars]
+
+med_subsetS <- med_subset %>%
+  slice(1:3000)
+```
+
+
 ```{r}
 # Set the seed
 set.seed(253)
 
 # Run the model
-diab_logAll <- train(
-    readmitted30 ~ race + gender + age + admission_type_id + discharge_disposition_id + admission_source_id + time_in_hospital + num_lab_procedures + num_procedures + num_medications,
-    data = diab_train, 
+diabO_logAll <- train(
+    readmitted30 ~ .,
+    data = other_subset, 
     method = "glm",
     family = "binomial",
     trControl = trainControl(method = "cv", number = 5),
@@ -163,30 +179,166 @@ diab_logAll <- train(
 ```
 
 ```{r}
-summary(diab_logAll)
-diab_logAll$results$Accuracy
-
+summary(diabO_logAll)
+diabO_logAll$results$Accuracy
 ```
-readmitted30 ~ race + gender + age + admission_type_id + discharge_disposition_id + admission_source_id + time_in_hospital,
-.8855722
+
+```{r}
+# Set the seed
+set.seed(253)
+
+# Run the model
+diabM_logAll <- train(
+    readmitted30 ~ .,
+    data = med_subset, 
+    method = "glm",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 5),
+    metric = "Accuracy",
+    na.action = na.omit
+)
+```
+
+```{r}
+summary(diabM_logAll)
+diabM_logAll$results$Accuracy
+```
+
+# LASSO
+```{r}
+set.seed(253)
+
+diabO_lasso <- train(
+    readmitted30 ~ .,
+    data = other_subset,
+    method = "glmnet",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+    tuneGrid = data.frame(alpha = 1, 
+                          lambda = 10^seq(-3, -1, length = 100)),
+    metric = "Accuracy",
+    na.action = na.omit
+)
+
+diabO_lasso$bestTune
+```
+```{r}
+diabO_lasso$results %>% 
+  ggplot(aes(x = lambda, y = Accuracy)) +
+  geom_line() +
+  geom_point() +
+  scale_x_log10()
+```
 
 
-set.seed(327)
+```{r}
+set.seed(253)
+
+#lambda_grid <- 10^seq(-4, -2, length = 100)
+
+diabM_lasso <- train(
+    readmitted30 ~ .,
+    data = med_subset,
+    method = "glmnet",
+    family = "binomial",
+    trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+    tuneGrid = data.frame(alpha = 1, 
+                          lambda = 10^seq(-4, -1, length = 100)),
+    metric = "Accuracy",
+    na.action = na.omit
+)
+
+diabM_lasso$bestTune
+```
+
+```{r}
+diabM_lasso$results %>% 
+  ggplot(aes(x = lambda, y = Accuracy)) +
+  geom_line() +
+  geom_point() +
+  scale_x_log10()
+
+coefficients(diabM_lasso$finalModel, s = diabM_lasso$bestTune$lambda)
+```
+
+# classification tree
+```{r}
+set.seed(253)
+
+diabO_tree <- train(
+  readmitted30 ~ .,
+  data = other_subset,
+  method = "rpart",
+  tuneGrid = data.frame(cp = 10^seq(-4, -3 , 
+                                    length = 50)),
+  trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+  metric = "Accuracy",
+  na.action = na.omit
+)
+```
+
+```{r}
+diabO_tree$bestTune
+diabO_tree
+
+diabO_tree$results %>%
+  ggplot(aes(x = cp, y = Accuracy)) +
+  geom_line()+
+  geom_point()
+```
+
+
+```{r}
+set.seed(253)
+
+diabM_tree <- train(
+  readmitted30 ~ .,
+  data = med_subset,
+  method = "rpart",
+  tuneGrid = data.frame(cp = 10^seq(-4, -2, 
+                                    length = 50)),
+  trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+  metric = "Accuracy",
+  na.action = na.omit
+)
+```
+
+```{r}
+diabM_tree$results %>%
+  ggplot(aes(x = cp, y = Accuracy)) +
+  geom_line()+
+  geom_point()
+```
+
 
 # random forest
-diab_randf <- train(
+
+```{r}
+set.seed(327)
+diabM_randf <- train(
   readmitted30 ~ .,
-  data = diab_train %>% select(-weight, -encounter_id, -patient_nbr, -payer_code, -medical_specialty), 
+  data = med_subsetS %>% select(-miglitol, -nateglinide), 
   method = "rf",
   metric = "Accuracy",
   trControl = trainControl(method = "oob"),
-  tuneGrid = data.frame(mtry = c(2,4,6)),
-  ntree = 50, #number of trees used, default is 500
+  tuneGrid = data.frame(mtry = c(4,6,8,10,12,14)),
+  ntree = 100, #number of trees used, default is 500
   importance = TRUE, #for importance plots later
   nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
   na.action = na.omit
 )
+```
 
+
+```{r}
+plot(diabM_randf$finalModel)
+diabM_randf$results
+```
+
+```{r}
+vip(diabM_randf$finalModel)
+
+```
 
 ## PROCESS
 
