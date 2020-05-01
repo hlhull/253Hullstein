@@ -6,10 +6,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
 ```
 
-```{r, echo=FALSE}
+```{r}
 #plotting and exploring
 library(tidyverse) #for plotting and summarizing
 library(vip) #for importance plots
@@ -39,9 +39,9 @@ library(e1071)
 theme_set(theme_minimal())
 ```
 
-## INTRODUCTION
+# Introduction
 
-```{r, echo = FALSE}
+```{r}
 # read in data, replace ? with NA
 diabetes <- read_csv("diabetic_data.csv", na = "?")
 
@@ -84,7 +84,7 @@ diabetes$readmitted30 <- as.factor(diabetes$readmitted30)
 
 ```
 
-```{r, echo = FALSE}
+```{r}
 # split into test and train
 set.seed(253) 
 diab_split <- initial_split(diabetes, prop = .7, 
@@ -101,11 +101,15 @@ Research question: What variables can be used to best predict whether or not a d
 
 Plan of action: Using modeling techniques that we have learned in class, we plan to apply various models to the dataset (such as logistic regression and lasso) in an effort to determine which predictors are most useful in assessing whether a patient will be readmitted to a hospital.
 
-Data cleaning: We performed some data cleaning before testing the models. 
-- If predictor variables had a few terms that constituted the majority of observations, we grouped the more sparse terms into an “other” category (or an equivalent grouping that made sense). This was done for `discharge_disposition_id`, `admission_type_id`, `admission_source_id`, and `age`.
-- We removed observations corresponding to patients who died or were placed on hospice. While they technically were not readmitted to a hospital within 30 days, they are not healthy and would skew that data.
-- We removed variables that had majority missing values or for which most of the observations had the same term. This resulted in the dropping of `weight`, several medications, and a few other variables.
-- Finally, we created our response variable, `readmitted30`, to be a binomial variable to allow for logistic regression analysis. This variable is `true` if the patient is readmitted into the hospital within 30 days of being discharged, and `false` otherwise.
+Data cleaning: We performed some data cleaning before testing the models.
+
+* If predictor variables had a few terms that constituted the majority of observations, we grouped the more sparse terms into an “other” category (or an equivalent grouping that made sense). This was done for `discharge_disposition_id`, `admission_type_id`, `admission_source_id`, and `age`.
+
+* We removed observations corresponding to patients who died or were placed on hospice. While they technically were not readmitted to a hospital within 30 days, they are not healthy and would skew that data.
+
+* We removed variables that had majority missing values or for which most of the observations had the same term. This resulted in the dropping of `weight`, several medications, and a few other variables.
+
+* Finally, we created our response variable, `readmitted30`, to be a binomial variable to allow for logistic regression analysis. This variable is `true` if the patient is readmitted into the hospital within 30 days of being discharged, and `false` otherwise.
 
 
 The following is a graph summarizing the response variable, `readmitted30`.
@@ -117,49 +121,49 @@ ggplot(diabetes, aes(x=readmitted30)) +
 
 As you can see, most patients were not readmitted within 30 days. Because of this imbalance, we had to down sample our models so that they didn't end up reflecting the No Information Rate. Instead, we would rather have more false positives, so that doctors are aware of patients who may be at a higher risk of being readmitted.
 
-## EXPLORATORY ANALYSIS
+# Exploratory Analysis
 
-```{r, hide = TRUE}
-table(diab_train$readmitted30) %>% prop.table()
-dim(diab_train)
-glimpse(diab_train)
+```{r, results = 'hide'}
+# table(diab_train$readmitted30) %>% prop.table()
+# dim(diab_train)
+# glimpse(diab_train)
 ```
 
 
-```{r, hide = TRUE}
-ggplot(diabetes, aes(x=readmitted30)) +
-  geom_bar()
-
-ggplot(diabetes, aes(x=num_lab_procedures, fill = readmitted30)) +
-  geom_histogram()
+```{r, results = 'hide'}
+# ggplot(diabetes, aes(x=readmitted30)) +
+#   geom_bar()
+# 
+# ggplot(diabetes, aes(x=num_lab_procedures, fill = readmitted30)) +
+#   geom_histogram()
 ```
 
-```{r, hide = TRUE}
+```{r, results = 'hide'}
 
-ggplot(diabetes, aes(x=age, fill=readmitted30)) +
-  geom_bar(position="fill")
-
-diabetes %>% 
-  ggplot(aes(x = age, fill = readmitted30)) +
-  geom_bar(position = "fill")
-
-diabetes %>% 
-  ggplot(aes(x = readmitted30, fill = age)) +
-  geom_bar(position = "fill")
-
-diabetes %>% 
-  ggplot(aes(x = readmitted30, fill = A1Cresult)) +
-  geom_bar(position = "fill")
-
-diabetes %>% 
-  ggplot(aes(x = readmitted30, fill = factor(time_in_hospital))) +
-  geom_bar(position = "fill")
-diabetes %>% 
-  ggplot(aes(x = factor(time_in_hospital), fill = readmitted30)) +
-  geom_bar(position = "fill")
-
-ggplot(diabetes, aes(x=time_in_hospital, fill=readmitted30)) +
-  geom_density(alpha=.5)
+# ggplot(diabetes, aes(x=age, fill=readmitted30)) +
+#   geom_bar(position="fill")
+# 
+# diabetes %>% 
+#   ggplot(aes(x = age, fill = readmitted30)) +
+#   geom_bar(position = "fill")
+# 
+# diabetes %>% 
+#   ggplot(aes(x = readmitted30, fill = age)) +
+#   geom_bar(position = "fill")
+# 
+# diabetes %>% 
+#   ggplot(aes(x = readmitted30, fill = A1Cresult)) +
+#   geom_bar(position = "fill")
+# 
+# diabetes %>% 
+#   ggplot(aes(x = readmitted30, fill = factor(time_in_hospital))) +
+#   geom_bar(position = "fill")
+# diabetes %>% 
+#   ggplot(aes(x = factor(time_in_hospital), fill = readmitted30)) +
+#   geom_bar(position = "fill")
+# 
+# ggplot(diabetes, aes(x=time_in_hospital, fill=readmitted30)) +
+#   geom_density(alpha=.5)
 ```
 
 ```{r}
@@ -196,57 +200,55 @@ diabetes %>%
 
 Finally, `number_diagnoses` was one last key variable. It describes how many diagnoses were entered into the patients record during the hospital visit. As the number of diagnoses increases, so does the proportion of patients readmitted.
 
-## MODELS
-
-TO DO: Exploratory work and basic models. Use graphs to illustrate interesting relationships that play a role in your final model. DO NOT just show a bunch of graphs because you can. You should label and discuss every graph you include. There is no required number to include. The graphs should be helping us to understand something about your final model and should help us engage more with the data.
+# Models
 
 
-# LOGISTIC REGRESSION 
+## Logistic Regression 
 
-```{r, hide = TRUE}
-other_vars <- c('race', 'gender', 'age', 'admission_type_id', 'discharge_disposition_id', 'admission_source_id','time_in_hospital','num_lab_procedures','num_procedures', 'num_medications', 'readmitted30')
-other_subset <- diab_train[other_vars]
-
-
-med_vars <- c('metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride', 'glipizide','glyburide','pioglitazone','rosiglitazone','acarbose','miglitol','tolazamide',
-  'insulin', 'readmitted30')
-med_subset <- diab_train[med_vars]
-
-med_subsetS <- med_subset %>%
-  slice(1:3000)
+```{r, results = 'hide'}
+# other_vars <- c('race', 'gender', 'age', 'admission_type_id', 'discharge_disposition_id', 'admission_source_id','time_in_hospital','num_lab_procedures','num_procedures', 'num_medications', 'readmitted30')
+# other_subset <- diab_train[other_vars]
+# 
+# 
+# med_vars <- c('metformin', 'repaglinide', 'nateglinide', 'chlorpropamide', 'glimepiride', 'glipizide','glyburide','pioglitazone','rosiglitazone','acarbose','miglitol','tolazamide',
+#   'insulin', 'readmitted30')
+# med_subset <- diab_train[med_vars]
+# 
+# med_subsetS <- med_subset %>%
+#   slice(1:3000)
 ```
 
 
-```{r, hide = TRUE}
-# Set the seed
-set.seed(253)
-
-# Run the model
-diabO_logAll <- train(
-    readmitted30 ~ .,
-    data = other_subset, 
-    method = "glm",
-    family = "binomial",
-    trControl = trainControl(method = "cv", number = 5, sampling = "down"),
-    metric = "Accuracy",
-    na.action = na.omit
-)
+```{r, results = 'hide'}
+# # Set the seed
+# set.seed(253)
+# 
+# # Run the model
+# diabO_logAll <- train(
+#     readmitted30 ~ .,
+#     data = other_subset, 
+#     method = "glm",
+#     family = "binomial",
+#     trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+#     metric = "Accuracy",
+#     na.action = na.omit
+# )
 ```
 
-```{r, hide = TRUE}
-summary(diabO_logAll$finalModel) %>% 
-  coef() %>% 
-  tidy() %>% 
-  select(`.rownames`, Estimate) %>% 
-  mutate(exp_coef = exp(Estimate))
-diabO_logAll$results$Accuracy
+```{r, results = 'hide'}
+# summary(diabO_logAll$finalModel) %>% 
+#   coef() %>% 
+#   tidy() %>% 
+#   select(`.rownames`, Estimate) %>% 
+#   mutate(exp_coef = exp(Estimate))
+# diabO_logAll$results$Accuracy
 
 #confusionMatrix(data = predict(diabO_logAll, type = "raw"), #predictions
 #                reference = other_subset$readmitted30, #actuals
 #                positive = "true") 
 ```
 
-```{r}
+```{r, echo = TRUE}
 # Set the seed
 set.seed(253)
 
@@ -263,42 +265,40 @@ diab_logAll <- train(
 ```
 
 ```{r}
-summary(diab_logAll$finalModel) %>% 
-  coef() %>% 
-  tidy() %>% 
-  select(`.rownames`, Estimate) %>% 
-  mutate(exp_coef = exp(Estimate))
 diab_logAll$results$Accuracy
+
+confusionMatrix(data = predict(diab_logAll, type = "raw", na.action = na.pass), #predictions
+                reference = na.omit(diab_train)$readmitted30)#, #actuals
 ```
 
-# LASSO
-```{r, hide = TRUE}
-set.seed(253)
-
-diabO_lasso <- train(
-    readmitted30 ~ .,
-    data = other_subset,
-    method = "glmnet",
-    family = "binomial",
-    trControl = trainControl(method = "cv", number = 5, sampling = "down"),
-    tuneGrid = data.frame(alpha = 1, 
-                          lambda = 10^seq(-5, -1, length = 100)),
-    metric = "Accuracy",
-    na.action = na.omit
-)
-
-diabO_lasso$bestTune
+## Lasso
+```{r, results = 'hide'}
+# set.seed(253)
+# 
+# diabO_lasso <- train(
+#     readmitted30 ~ .,
+#     data = other_subset,
+#     method = "glmnet",
+#     family = "binomial",
+#     trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+#     tuneGrid = data.frame(alpha = 1, 
+#                           lambda = 10^seq(-5, -1, length = 100)),
+#     metric = "Accuracy",
+#     na.action = na.omit
+# )
+# 
+# diabO_lasso$bestTune
 ```
-```{r, hide = TRUE}
-diabO_lasso$results %>% 
-  ggplot(aes(x = lambda, y = Accuracy)) +
-  geom_line() +
-  geom_point() +
-  scale_x_log10()
+```{r, results = 'hide'}
+# diabO_lasso$results %>% 
+#   ggplot(aes(x = lambda, y = Accuracy)) +
+#   geom_line() +
+#   geom_point() +
+#   scale_x_log10()
 ```
 
 
-```{r}
+```{r, echo = TRUE}
 set.seed(253)
 
 diab_lasso <- train(
@@ -323,43 +323,46 @@ diab_lasso$results %>%
   scale_x_log10()
 
 coefficients(diab_lasso$finalModel, s = diab_lasso$bestTune$lambda)
+
+confusionMatrix(data = predict(diab_lasso, type = "raw", na.action = na.pass), #predictions
+                reference = na.omit(diab_train)$readmitted30)#, #actuals
 ```
 
-# classification tree
-```{r, hide = TRUE}
-set.seed(253)
-
-diabO_tree <- train(
-  readmitted30 ~ .,
-  data = other_subset,
-  method = "rpart",
-  tuneGrid = data.frame(cp = 10^seq(-4, -2 , 
-                                    length = 50)),
-  trControl = trainControl(method = "cv", number = 5, sampling = "down"),
-  metric = "Accuracy",
-  na.action = na.omit
-)
+## Classification Tree
+```{r, results = 'hide'}
+# set.seed(253)
+# 
+# diabO_tree <- train(
+#   readmitted30 ~ .,
+#   data = other_subset,
+#   method = "rpart",
+#   tuneGrid = data.frame(cp = 10^seq(-4, -2 , 
+#                                     length = 50)),
+#   trControl = trainControl(method = "cv", number = 5, sampling = "down"),
+#   metric = "Accuracy",
+#   na.action = na.omit
+# )
 ```
 
-```{r, hide = TRUE}
-diabO_tree$bestTune
-diabO_tree
-
-diabO_tree$results %>%
-  ggplot(aes(x = cp, y = Accuracy)) +
-  geom_line()+
-  geom_point()
+```{r, results = 'hide'}
+# diabO_tree$bestTune
+# diabO_tree
+# 
+# diabO_tree$results %>%
+#   ggplot(aes(x = cp, y = Accuracy)) +
+#   geom_line()+
+#   geom_point()
 ```
 
 
-```{r}
+```{r, echo = TRUE}
 set.seed(253)
 
 diab_tree <- train(
   readmitted30 ~ .,
   data = diab_train %>% select(-readmitted),
   method = "rpart",
-  tuneGrid = data.frame(cp = 10^seq(-5, -2, # note if you go out to -1 you see the no information rate
+  tuneGrid = data.frame(cp = 10^seq(-5, -2, # if you go out to -1 you see the no information rate
                                     length = 100)),
   trControl = trainControl(method = "cv", number = 5, sampling = "down"),
   metric = "Accuracy",
@@ -372,21 +375,24 @@ diab_tree$results %>%
   ggplot(aes(x = cp, y = Accuracy)) +
   geom_line()+
   geom_point()
+
+confusionMatrix(data = predict(diab_tree, type = "raw", na.action = na.pass), #predictions
+                reference = na.omit(diab_train)$readmitted30)#, #actuals
 ```
 
 
-# random forest
+## Random Forest
 
-```{r}
+```{r, echo = TRUE}
 set.seed(327)
 diab_randf <- train(
   readmitted30 ~ .,
-  data = diab_train %>% select(-readmitted),#med_subsetS %>% select(-miglitol, -nateglinide), 
+  data = diab_train %>% select(-readmitted), 
   method = "rf",
   metric = "Accuracy",
   trControl = trainControl(method = "oob", sampling = "down"),
   tuneGrid = data.frame(mtry = c(2,4,6,8,10,12)),
-  ntree = 100, #number of trees used, default is 500
+  ntree = 50, #number of trees used, default is 500
  importance = TRUE, #for importance plots later
   nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
  na.action = na.omit
@@ -396,6 +402,7 @@ diab_randf <- train(
 
 ```{r}
 plot(diab_randf$finalModel)
+
 diab_randf$results
 ```
 
@@ -405,11 +412,11 @@ vip(diab_randf$finalModel)
 
 We also plan on adding some discussion of each model.
 
-## EVALUATING THE MODELS
+# Evaluating the Models
 
 Here we will compare the cross-validated / OOB accuracy of the models to each other and pick the best models to apply them to the test set to determine our final best model.
 
-## CONCLUSION
+# Conclusion
 
 We were not able to develop a model that yielded a better prediction of hospital readmittance than the NIR, which was 0.886. However, we created a model using the lasso technique with fairly high accuracy and fewer variables. A model with comparable accuracy and less predictor variables is still desirable because it is less complex and inaccessible to non-statisticians while still allowing doctors to make predictions about which diabetes patients should be more closely monitored based on their likelihood to be readmitted within 30 days. In particular, we found that a patient’s previous hospital admittance history (`number_inpatient`) and where they were discharged to (`discharge_disposition_id`) were key in predicting whether they’d be readmitted soon. Additionally, the number of diagnoses a patient had (`number_diagnoses`) was a key variable, possibly because it indicates other conditions and the severity of their diabetes. Interestingly, the medication(s) they were put on did not seem to have much of an impact on readmittance. We tried a few models on a subset of the data composed only of predictor variables that were diabetes medications. We expected medications to be relatively powerful predictors, but we were surprised to find that the best of these models only resulted in about 60% accuracy.
 
