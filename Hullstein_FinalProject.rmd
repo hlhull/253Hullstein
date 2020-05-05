@@ -1,6 +1,6 @@
 ---
 title: "Hullstein_FinalProject"
-author: "Eleanor Wettstein"
+author: "Holly Hull and Eleanor Wettstein"
 date: "4/21/2020"
 output: html_document
 ---
