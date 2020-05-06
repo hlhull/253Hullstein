@@ -82,6 +82,8 @@ diabetes <- diabetes %>%
   mutate(readmitted30 = ifelse(readmitted == "<30", 'true', 'false'))
 diabetes$readmitted30 <- as.factor(diabetes$readmitted30)
 
+# remove NA rows
+diabetes <- na.omit(diabetes)
 ```
 
 ```{r}
@@ -202,6 +204,16 @@ Finally, `number_diagnoses` was one last key variable. It describes how many dia
 
 # Models
 
+```{r}
+calcAUC <- function(model, data){
+  newData <- na.omit(data) %>% 
+    mutate(PredProb = predict(model, newdata = data, type="prob")$"true")
+  newData %>% 
+    roc(readmitted30, PredProb) %>% 
+    auc()
+}
+```
+
 
 ## Logistic Regression 
 
@@ -267,8 +279,10 @@ diab_logAll <- train(
 ```{r}
 diab_logAll$results$Accuracy
 
+calcAUC(diab_logAll, diab_train)
+
 confusionMatrix(data = predict(diab_logAll, type = "raw", na.action = na.pass), #predictions
-                reference = na.omit(diab_train)$readmitted30)#, #actuals
+                reference = diab_train$readmitted30)#, #actuals
 ```
 
 ## Lasso
@@ -322,10 +336,15 @@ diab_lasso$results %>%
   geom_point() +
   scale_x_log10()
 
+diab_lasso$bestTune$lambda
+diab_lasso$results
+
+calcAUC(diab_lasso, diab_train)
+
 coefficients(diab_lasso$finalModel, s = diab_lasso$bestTune$lambda)
 
 confusionMatrix(data = predict(diab_lasso, type = "raw", na.action = na.pass), #predictions
-                reference = na.omit(diab_train)$readmitted30)#, #actuals
+                reference = diab_train$readmitted30)#, #actuals
 ```
 
 ## Classification Tree
@@ -370,18 +389,29 @@ diab_tree <- train(
 )
 ```
 
+
+```{r}
+diab_tree$bestTune
+diab_tree$results
+```
+
+
 ```{r}
 diab_tree$results %>%
   ggplot(aes(x = cp, y = Accuracy)) +
   geom_line()+
   geom_point()
 
+calcAUC(diab_tree, diab_train)
+
 confusionMatrix(data = predict(diab_tree, type = "raw", na.action = na.pass), #predictions
-                reference = na.omit(diab_train)$readmitted30)#, #actuals
+                reference = diab_train$readmitted30)#, #actuals
 ```
 
 
 ## Random Forest
+
+
 
 ```{r, echo = TRUE}
 set.seed(327)
@@ -393,9 +423,9 @@ diab_randf <- train(
   trControl = trainControl(method = "oob", sampling = "down"),
   tuneGrid = data.frame(mtry = c(2,4,6,8,10,12)),
   ntree = 50, #number of trees used, default is 500
- importance = TRUE, #for importance plots later
+  importance = TRUE, #for importance plots later
   nodesize = 5, #this is the default terminal node size for regression trees. Could set larger for smaller trees.
- na.action = na.omit
+  na.action = na.omit
 )
 ```
 
@@ -403,16 +433,59 @@ diab_randf <- train(
 ```{r}
 plot(diab_randf$finalModel)
 
+calcAUC(diab_randf, diab_train)
+
+confusionMatrix(data = predict(diab_randf, diab_train, type = "raw"), #predictions
+                reference = na.omit(diab_train)$readmitted30)#, #actuals
+
 diab_randf$results
 ```
+```{r}
+diab_randf$bestTune
+diab_randf$results
+```
+
+
 
 ```{r}
 vip(diab_randf$finalModel)
 ```
 
-We also plan on adding some discussion of each model.
 
 # Evaluating the Models
+
+```{r}
+x <- matrix(c(0.6569,0.7180,0.6028,0.6768,0.6423,0.7173,0.6296,0.5918,0.6583,0.6429,0.6398,0.7894), nrow = 4, dimnames = list(c("logisitic","lasso","classification tree", "random forest"), c("Sensitivity (TPR) |","CV/OOB Accuracy |","AUC")))
+kable(x, align = c('ccc'))
+```
+
+
+```{r}
+# function to compute accuracy 
+calcAccuracy <- function(model, data){
+  newData <- data %>%
+    mutate(predRead = predict(model, newdata = data),
+           diff = abs(as.numeric(readmitted30) - as.numeric(predRead)))
+  1-(sum(as.numeric(newData$diff))/as.numeric(count(data)))
+}
+
+calcSensitivity <- function(model){
+  cm <- confusionMatrix(data = predict(model, diab_test, type = "raw"), #predictions
+                reference = diab_test$readmitted30)#, #actuals
+  cm$byClass['Sensitivity']
+}
+
+```
+
+```{r}
+
+y <- matrix(c(calcSensitivity(diab_logAll),calcSensitivity(diab_lasso),calcSensitivity(diab_randf)
+,calcAccuracy(diab_logAll, diab_test),calcAccuracy(diab_lasso, diab_test),calcAccuracy(diab_randf, diab_test)
+), nrow = 3, dimnames = list(c("logisitic","lasso", "random forest"), c("Sensitivity (TPR) |","Accuracy")))
+
+kable(y, align = c('ccc'))
+```
+
 
 Here we will compare the cross-validated / OOB accuracy of the models to each other and pick the best models to apply them to the test set to determine our final best model.
 
