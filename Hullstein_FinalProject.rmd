@@ -1,8 +1,10 @@
 ---
-title: "Hullstein_FinalProject"
+title: "Hullstein Final Project: Analyzing Diabetes Readmittance"
 author: "Holly Hull and Eleanor Wettstein"
-date: "4/21/2020"
-output: html_document
+date: "5/7/2020"
+output: 
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -33,6 +35,7 @@ library(leaps) #for variable selection
 library(glmnet) #for LASSO
 library(rpart) #for decision trees
 library(randomForest) #for bagging and random forests
+library(rpart.plot)
 
 library(e1071)
 
@@ -121,7 +124,7 @@ ggplot(diabetes, aes(x=readmitted30)) +
   geom_bar()
 ```
 
-As you can see, most patients were not readmitted within 30 days. Because of this imbalance, we had to down sample our models so that they didn't end up reflecting the No Information Rate. Instead, we would rather have more false positives, so that doctors are aware of patients who may be at a higher risk of being readmitted.
+As you can see, most patients were not readmitted within 30 days. Because of this imbalance, we had to down sample our models so that they didn't end up reflecting the No Information Rate (NIR). Instead, we would rather have more false positives, so that doctors are aware of patients who may be at a higher risk of being readmitted.
 
 # Exploratory Analysis
 
@@ -281,9 +284,14 @@ diab_logAll$results$Accuracy
 
 calcAUC(diab_logAll, diab_train)
 
-confusionMatrix(data = predict(diab_logAll, type = "raw", na.action = na.pass), #predictions
+cm_logAll <- confusionMatrix(data = predict(diab_logAll, type = "raw", na.action = na.pass), #predictions
                 reference = diab_train$readmitted30)#, #actuals
+
+cm_logAll$byClass['Sensitivity']
 ```
+
+For our preliminary model, we performed a logistic regression using all the predictor variables. We computed the accuracy, sensitivity, and area under the curve (AUC), which are statistics that give insight about how well our models perform. We were particularly interested in the sensitivity, or True Positive Rate (TPR), which describes the proportion of patients who were correctly predicted to be readmitted within 30 days. Our goal is to maximize this value, so that medical practitioners will gain insight about which patients should be monitored more closely after they are discharged. For this model, the sensitivity is 0.6569. The accuracy and AUC are 0.6423 and 0.6583, respectively, and are summarized in Table 1. 
+
 
 ## Lasso
 ```{r, results = 'hide'}
@@ -337,15 +345,20 @@ diab_lasso$results %>%
   scale_x_log10()
 
 diab_lasso$bestTune$lambda
-diab_lasso$results
+diab_lasso$results[85,]
 
 calcAUC(diab_lasso, diab_train)
 
-coefficients(diab_lasso$finalModel, s = diab_lasso$bestTune$lambda)
+#coefficients(diab_lasso$finalModel, s = diab_lasso$bestTune$lambda)
 
-confusionMatrix(data = predict(diab_lasso, type = "raw", na.action = na.pass), #predictions
+cm_lasso <- confusionMatrix(data = predict(diab_lasso, type = "raw", na.action = na.pass), #predictions
                 reference = diab_train$readmitted30)#, #actuals
+
+cm_lasso$byClass['Sensitivity']
 ```
+
+Next, we used LASSO to construct a model. We tested a wide range of tuning parameter values and found the “best” lambda, which corresponded to the maximum accuracy, as shown in the plot (above). With lambda = 0.0351, most of the coefficients were shrunk to 0. Those that remained in the model include `discharge_disposition,` `number_inpatient,` `number_diagnoses,` and `time_in_hospital,` which were mentioned previously as variables found to be more influential. The sensitivity was 0.7180, which is higher than the logistic regression model and indicates that this model is better at correctly predicting which patients are readmitted within 30 days. The accuracy was better than the previous logistic model, while the AUC decreased a bit.
+
 
 ## Classification Tree
 ```{r, results = 'hide'}
@@ -389,12 +402,9 @@ diab_tree <- train(
 )
 ```
 
-
-```{r}
-diab_tree$bestTune
-diab_tree$results
+```{r, fig.width=10}
+rpart.plot(diab_tree$finalModel)
 ```
-
 
 ```{r}
 diab_tree$results %>%
@@ -402,11 +412,20 @@ diab_tree$results %>%
   geom_line()+
   geom_point()
 
+diab_tree$bestTune
+diab_tree$results[75,]
+
 calcAUC(diab_tree, diab_train)
 
-confusionMatrix(data = predict(diab_tree, type = "raw", na.action = na.pass), #predictions
+cm_tree <- confusionMatrix(data = predict(diab_tree, type = "raw", na.action = na.pass), #predictions
                 reference = diab_train$readmitted30)#, #actuals
+
+cm_tree$byClass['Sensitivity']
 ```
+
+We also built two hierarchical models: a classification tree and a random forest. We again tested a range of values for the tuning parameter, which for tree models is the complexity parameter (cp) (see above graph). We found a cp value that gave a maximal accuracy of 0.6296, which is lower than the previous two models. The sensitivity obtained with the classification tree was 0.6028, which is quite a bit smaller than the other two models. The AUC was slightly lower than for the previous models.
+
+We visualized the results as a tree. Looking at this output, we can reaffirm that variables found to be more significant in the LASSO model, like `number_inpatient` and `discharge_disposition_id`, are important. The tree also includes other variables, like `metformin` and `admission_type`, which were not included in the LASSO model, but are still influential.
 
 
 ## Random Forest
@@ -431,33 +450,38 @@ diab_randf <- train(
 
 
 ```{r}
-plot(diab_randf$finalModel)
+# plot(diab_randf$finalModel)
 
 calcAUC(diab_randf, diab_train)
 
-confusionMatrix(data = predict(diab_randf, diab_train, type = "raw"), #predictions
-                reference = na.omit(diab_train)$readmitted30)#, #actuals
+cm_randf <- confusionMatrix(data = predict(diab_randf, diab_train, type = "raw"), #predictions
+                reference = diab_train$readmitted30)#, #actuals
 
-diab_randf$results
-```
-```{r}
+cm_randf$byClass['Sensitivity']
+
 diab_randf$bestTune
-diab_randf$results
+diab_randf$results[3,]
 ```
-
-
 
 ```{r}
 vip(diab_randf$finalModel)
 ```
 
+For the random forest method we used 50 trees, after verifying that the error levelled out by this number. The tuning parameter of interest is mtry, which represents the number of variables considered at each split. We found that mtry = 6 corresponded to the highest accuracy. The sensitivity is 0.6768, which is the second highest sensitivity of all the models. Surprisingly, when compared to sensitivity, the accuracy and AUC were more disparate than for other models. The accuracy, 0.5979, was the lowest of all models and the AUC, 0.7894, was the highest. 
+
+We also created an importance plot for the random forest to examine which variables were most significant in the model. From the plot, we again see that `number_inpatient`, `discharge_disposition_id`, and `number_emergency` are key variables.
+
 
 # Evaluating the Models
 
+First, we looked at the performance statistics for each models, built and evaluated with the training dataset: 
+
 ```{r}
-x <- matrix(c(0.6569,0.7180,0.6028,0.6768,0.6423,0.7173,0.6296,0.5918,0.6583,0.6429,0.6398,0.7894), nrow = 4, dimnames = list(c("logisitic","lasso","classification tree", "random forest"), c("Sensitivity (TPR) |","CV/OOB Accuracy |","AUC")))
+x <- matrix(c(0.6569,0.7180,0.6028,0.6768,0.6423,0.7173,0.6296,0.5918,0.6583,0.6429,0.6398,0.7894), nrow = 4, dimnames = list(c("logisitic","lasso","classification tree", "random forest"), c("Sensitivity (TPR)","CV/OOB Accuracy","AUC")))
 kable(x, align = c('ccc'))
 ```
+
+In the context of our research question, we are most interested in the sensitivity of the model, since that is what ensures that high-risk patients are identified and can be monitored when they leave the hospital. In addition, we kept in mind overall accuracy and AUC to judge how the models did on the whole. Looking at the table, we see that the LASSO model has the best sensitivity and accuracy, while the classification tree has the lowest sensitivity, accuracy, and AUC. Meanwhile, the logistic model is mediocre in all categories and the random forest has a good sensitivity, poor accuracy, and very good AUC. As a result, we decided to move forward with the logistic, LASSO, and random forest models and see how well they perform on the test data.
 
 
 ```{r}
@@ -477,21 +501,22 @@ calcSensitivity <- function(model){
 
 ```
 
+The following table summarizes the computed sensitivity and accuracy of the models on the test data. We excluded AUC because our primary interest is sensitivity, and we felt that the accuracy was comprehensive enough to give us a complementary measure of how the model is doing on the entire test dataset.
+
 ```{r}
 
 y <- matrix(c(calcSensitivity(diab_logAll),calcSensitivity(diab_lasso),calcSensitivity(diab_randf)
 ,calcAccuracy(diab_logAll, diab_test),calcAccuracy(diab_lasso, diab_test),calcAccuracy(diab_randf, diab_test)
-), nrow = 3, dimnames = list(c("logisitic","lasso", "random forest"), c("Sensitivity (TPR) |","Accuracy")))
+), nrow = 3, dimnames = list(c("logisitic","lasso", "random forest"), c("Sensitivity (TPR)","Accuracy")))
 
 kable(y, align = c('ccc'))
 ```
 
-
-Here we will compare the cross-validated / OOB accuracy of the models to each other and pick the best models to apply them to the test set to determine our final best model.
+Comparing the results above, we see the LASSO model is clearly our best. It has the highest sensitivity, 0.7209, and the highest accuracy, 0.6920. The logistic and random forest models performed similarly on the test data and neither was close to the performance of the LASSO model.
 
 # Conclusion
 
-We were not able to develop a model that yielded a better prediction of hospital readmittance than the NIR, which was 0.886. However, we created a model using the lasso technique with fairly high accuracy and fewer variables. A model with comparable accuracy and less predictor variables is still desirable because it is less complex and inaccessible to non-statisticians while still allowing doctors to make predictions about which diabetes patients should be more closely monitored based on their likelihood to be readmitted within 30 days. In particular, we found that a patient’s previous hospital admittance history (`number_inpatient`) and where they were discharged to (`discharge_disposition_id`) were key in predicting whether they’d be readmitted soon. Additionally, the number of diagnoses a patient had (`number_diagnoses`) was a key variable, possibly because it indicates other conditions and the severity of their diabetes. Interestingly, the medication(s) they were put on did not seem to have much of an impact on readmittance. We tried a few models on a subset of the data composed only of predictor variables that were diabetes medications. We expected medications to be relatively powerful predictors, but we were surprised to find that the best of these models only resulted in about 60% accuracy.
+We were not able to develop a model that yielded a better prediction of hospital readmittance than the NIR, which was 0.886. However, we created a model using the LASSO technique with fairly high sensitivity and fewer variables. A model with high sensitivity and less predictor variables is still desirable because it is less complex and inaccessible to non-statisticians, while still allowing doctors to make predictions about which diabetes patients should be more closely monitored based on their likelihood to be readmitted within 30 days. In particular, we found that a patient’s previous hospital admittance history (`number_inpatient`) and where they were discharged to (`discharge_disposition_id`) were key in predicting whether they’d be readmitted soon. Additionally, the number of diagnoses a patient had (`number_diagnoses`) was a key variable, possibly because it indicates other conditions and the severity of their diabetes. Interestingly, the medication(s) they were put on did not seem to have much of an impact on readmittance. We tried a few models on a subset of the data composed only of predictor variables that were diabetes medications, expecting medications to be relatively powerful predictors, but were surprised to find that the best of these models only resulted in about 60% accuracy. Overall, the LASSO model’s high sensitivity could help pinpoint patients at high risk for readmittance before they leave the hospital, which will allow doctors to be proactive in caring for patients and preventing readmittance.
 
 
 
